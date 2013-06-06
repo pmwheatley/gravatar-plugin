@@ -23,13 +23,28 @@
  */
 package org.jenkinsci.plugins.gravatar;
 
+import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
+import com.gargoylesoftware.htmlunit.html.HtmlLink;
+import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.google.common.collect.FluentIterable;
 import hudson.model.User;
 import hudson.tasks.Mailer;
 
+import org.hamcrest.Matcher;
+import org.jenkinsci.plugins.gravatar.cache.GravatarImageResolutionCache;
 import org.jvnet.hudson.test.HudsonTestCase;
 
 import com.gargoylesoftware.htmlunit.html.HtmlElement;
+import org.xml.sax.SAXException;
 
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.*;
+
+import static com.google.common.collect.Sets.newHashSet;
+import static com.google.common.collect.Sets.newHashSetWithExpectedSize;
 import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.*;
 
@@ -40,34 +55,86 @@ public class UserGravatarResolverIntegrationTest extends HudsonTestCase {
     public void setUp() throws Exception {
         super.setUp();
         wc = createWebClient();
-        wc.setJavaScriptEnabled(false);
     }
     
     public void testUserWithoutEmailAddressUsesDefaultImage() throws Exception {
-        User.get("user-no-email", true);
-        assertAllImageLoadSuccessfully(wc.goTo("/people"));
+        newUser("user-no-email");
+        assertAllImageLoadSuccessfully(goAndWaitForLoadOfPeople());
         assertAllImageLoadSuccessfully(wc.goTo("/user/user-no-email"));
     }
     
     public void testNonExistingGravatarUsesDefaultImage() throws Exception {
-        User user = User.get("user", true);
+        User user = newUser("user");
         user.addProperty(new Mailer.UserProperty("MyEmailAddress@example.com"));
         
-        assertAllImageLoadSuccessfully(wc.goTo("/people"));
+        assertAllImageLoadSuccessfully(goAndWaitForLoadOfPeople());
         assertAllImageLoadSuccessfully(wc.goTo("/user/user"));
 
         HtmlElement element = wc.goTo("/user/user").getElementById("main-panel").getElementsByTagName("img").get(0);
         assertThat(element.getAttribute("src"), endsWith("user.png"));
     }
 
-    public void testGravatarIsUsedForUser() throws Exception {
-        User user = User.get("user-e", true);
+	public void testGravatarIsUsedForUser() throws Exception {
+        User user = newUser("user-e");
         user.addProperty(new Mailer.UserProperty("eramfelt@gmail.com"));
-        
-        assertAllImageLoadSuccessfully(wc.goTo("/people"));
+		prefetchImage(user);
+
+
+		assertAllImageLoadSuccessfully(goAndWaitForLoadOfPeople());
         assertAllImageLoadSuccessfully(wc.goTo("/user/user-e"));
 
         HtmlElement element = wc.goTo("/user/user-e").getElementById("main-panel").getElementsByTagName("img").get(0);
         assertThat(element.getAttribute("src"), startsWith("http://www.gravatar.com"));
     }
+
+	private void prefetchImage(User user) {
+		GravatarImageResolutionCache.INSTANCE.urlCreatorFor(user);
+	}
+
+	public void testManyManyUsers() throws Exception {
+		final int howMany = 1000;
+
+		Callable<HtmlPage> c = new Callable<HtmlPage>() {
+			public HtmlPage call() throws Exception {
+				createManyManyUsers(howMany);
+				return goAndWaitForLoadOfPeople();
+			}
+		};
+		ExecutorService executorService = Executors.newSingleThreadExecutor();
+		Future<HtmlPage> pageFuture = executorService.submit(c);
+		HtmlPage page = pageFuture.get(60, TimeUnit.SECONDS);
+		assertAllImageLoadSuccessfully(page);
+		assertThatUserCount(page, equalTo(howMany));
+
+	}
+
+	private void assertThatUserCount(HtmlPage page, Matcher<Integer> integerMatcher) {
+		List<HtmlAnchor> userLinks = page.selectNodes("//a[contains(@href,'/user/')]");
+		Set<String> targets = newHashSetWithExpectedSize(userLinks.size());
+		for (HtmlAnchor userLink : userLinks) {
+			targets.add(userLink.getHrefAttribute());
+		}
+		assertThat(targets.size(), integerMatcher);
+	}
+
+	private HtmlPage goAndWaitForLoadOfPeople() throws InterruptedException, IOException, SAXException {
+		HtmlPage htmlPage = wc.goTo("/asynchPeople");
+		while(htmlPage.getElementById("status").isDisplayed()) {
+			//the asynch part has not yet finished, so we wait.
+			Thread.sleep(500);
+		}
+		return htmlPage;
+	}
+
+	private void createManyManyUsers(int howMany) throws IOException {
+		for (int i= 0; i< howMany; i++) {
+			User user = newUser("manymanyuser" + i);
+			user.addProperty(new Mailer.UserProperty("user"+i+"@gmail.com"));
+		}
+	}
+
+	private User newUser(String userId) {
+		return User.get(userId, true, Collections.emptyMap());
+	}
+
 }

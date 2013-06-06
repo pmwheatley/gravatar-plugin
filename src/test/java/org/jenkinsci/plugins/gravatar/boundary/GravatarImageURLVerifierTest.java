@@ -23,23 +23,45 @@
  * THE SOFTWARE.
  */
 
-package org.jenkinsci.plugins.gravatar;
+package org.jenkinsci.plugins.gravatar.boundary;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.when;
 
+import jenkins.model.Jenkins;
+import org.jenkinsci.plugins.gravatar.boundary.GravatarImageURLVerifier;
+import org.jenkinsci.plugins.gravatar.factory.GravatarFactory;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mockito;
+import org.mockito.Spy;
+import org.mockito.runners.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class GravatarImageURLVerifierTest {
 
-    @Test
+	@Spy
+	private GravatarImageURLVerifier urlVerifier = new GravatarImageURLVerifier();
+
+	@Before
+	public void setUp() throws Exception {
+		doReturn(new GravatarFactory().testGravatar()).when(urlVerifier).gravatar();
+	}
+
+	@Test
     public void assertVerifierReturnsThatGravatarExists() {
-        GravatarImageURLVerifier urlVerifier = new GravatarImageURLVerifier();
         assertThat(urlVerifier.verify("eramfelt@gmail.com"), is(true));
     }
     @Test
     public void assertVerifierReturnsThatGravatarDoesNotExist() {
-        GravatarImageURLVerifier urlVerifier = new GravatarImageURLVerifier();
-        assertThat(urlVerifier.verify("MyEmailAddress@example.com"), is(false));
+        assertThat(urlVerifier.verify("MyEmailAddressABCDE@example.com"), is(false));
     }
+
+	@Test(expected = NullPointerException.class)
+	public void doesNotAllowNullEMails() throws Exception {
+		urlVerifier.verify(null);
+	}
 }
