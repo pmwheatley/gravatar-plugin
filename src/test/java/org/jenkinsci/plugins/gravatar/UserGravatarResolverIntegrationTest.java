@@ -91,7 +91,7 @@ public class UserGravatarResolverIntegrationTest extends HudsonTestCase {
 		GravatarImageResolutionCache.INSTANCE.urlCreatorFor(user);
 	}
 
-	public void testManyManyUsers() throws Exception {
+	public void testManyManyUsersWillNotBlockLoadingOfUsersPage() throws Exception {
 		final int howMany = 1000;
 
 		Callable<HtmlPage> c = new Callable<HtmlPage>() {
@@ -102,7 +102,7 @@ public class UserGravatarResolverIntegrationTest extends HudsonTestCase {
 		};
 		ExecutorService executorService = Executors.newSingleThreadExecutor();
 		Future<HtmlPage> pageFuture = executorService.submit(c);
-		HtmlPage page = pageFuture.get(60, TimeUnit.SECONDS);
+		HtmlPage page = pageFuture.get(60, TimeUnit.SECONDS); //if it takes longer than this we consider it to BLOCK!
 		assertAllImageLoadSuccessfully(page);
 		assertThatUserCount(page, equalTo(howMany));
 
