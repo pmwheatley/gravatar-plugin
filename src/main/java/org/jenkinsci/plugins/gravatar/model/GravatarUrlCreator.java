@@ -1,5 +1,6 @@
 package org.jenkinsci.plugins.gravatar.model;
 
+import com.google.common.annotations.VisibleForTesting;
 import de.bripkens.gravatar.DefaultImage;
 import de.bripkens.gravatar.Gravatar;
 import jenkins.model.Jenkins;
@@ -23,10 +24,12 @@ public class GravatarUrlCreator {
 	}
 
 	public String buildUrlForSize(int size) {
+		checkArgument(size > 0, "Only positive sizes are allowed.");
 		return gravatar().setSize(size).getUrl(email);
 	}
 
-	private Gravatar gravatar() {
+	@VisibleForTesting
+	Gravatar gravatar() {
 		return new GravatarFactory().userGravatar();
 	}
 
