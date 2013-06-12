@@ -25,7 +25,9 @@
 package org.jenkinsci.plugins.gravatar.cache;
 
 import java.io.IOException;
+import java.util.Collection;
 
+import com.google.common.annotations.VisibleForTesting;
 import hudson.Extension;
 import hudson.model.AsyncPeriodicWork;
 import hudson.model.PeriodicWork;
@@ -52,12 +54,17 @@ public class GravatarImageResolutionCacheLoader extends AsyncPeriodicWork{
 
     @Override
     protected void execute(TaskListener listener) throws IOException, InterruptedException {
-        for (User user : User.getAll()) {
-			GravatarImageResolutionCache.INSTANCE.loadIfUnknown(user);
+        for (User user : getAllUsers()) {
+			cache().loadIfUnknown(user);
 		}
 	}
-    
-    @Override
+
+	@VisibleForTesting
+	Collection<User> getAllUsers() {
+		return User.getAll();
+	}
+
+	@Override
     public long getRecurrencePeriod() {
         return PeriodicWork.MIN * 30;
     }
@@ -66,4 +73,9 @@ public class GravatarImageResolutionCacheLoader extends AsyncPeriodicWork{
     public long getInitialDelay() {
         return PeriodicWork.MIN;
     }
+
+	@VisibleForTesting
+	GravatarImageResolutionCache cache() {
+		return GravatarImageResolutionCacheInstance.INSTANCE;
+	}
 }

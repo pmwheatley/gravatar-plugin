@@ -24,17 +24,13 @@
 package org.jenkinsci.plugins.gravatar;
 
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
-import com.gargoylesoftware.htmlunit.html.HtmlLink;
+import com.gargoylesoftware.htmlunit.html.HtmlElement;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
-import com.google.common.collect.FluentIterable;
 import hudson.model.User;
 import hudson.tasks.Mailer;
-
 import org.hamcrest.Matcher;
-import org.jenkinsci.plugins.gravatar.cache.GravatarImageResolutionCache;
+import org.jenkinsci.plugins.gravatar.cache.GravatarImageResolutionCacheInstance;
 import org.jvnet.hudson.test.HudsonTestCase;
-
-import com.gargoylesoftware.htmlunit.html.HtmlElement;
 import org.xml.sax.SAXException;
 
 import java.io.IOException;
@@ -43,10 +39,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.*;
 
-import static com.google.common.collect.Sets.newHashSet;
 import static com.google.common.collect.Sets.newHashSetWithExpectedSize;
 import static org.hamcrest.CoreMatchers.*;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThat;
 
 public class UserGravatarResolverIntegrationTest extends HudsonTestCase {
     
@@ -88,7 +83,7 @@ public class UserGravatarResolverIntegrationTest extends HudsonTestCase {
     }
 
 	private void prefetchImage(User user) {
-		GravatarImageResolutionCache.INSTANCE.urlCreatorFor(user);
+		GravatarImageResolutionCacheInstance.INSTANCE.urlCreatorFor(user);
 	}
 
 	public void testManyManyUsersWillNotBlockLoadingOfUsersPage() throws Exception {

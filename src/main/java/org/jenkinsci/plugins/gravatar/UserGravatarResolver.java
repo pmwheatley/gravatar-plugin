@@ -30,6 +30,7 @@ import hudson.Extension;
 import hudson.model.User;
 import hudson.tasks.UserAvatarResolver;
 import org.jenkinsci.plugins.gravatar.cache.GravatarImageResolutionCache;
+import org.jenkinsci.plugins.gravatar.cache.GravatarImageResolutionCacheInstance;
 import org.jenkinsci.plugins.gravatar.model.GravatarUrlCreator;
 
 /**
@@ -52,11 +53,15 @@ public class UserGravatarResolver extends UserAvatarResolver {
 
 	@VisibleForTesting
 	protected GravatarUrlCreator urlCreatorFor(User user) {
-		return GravatarImageResolutionCache.INSTANCE.urlCreatorFor(user).get();
+		return cache().urlCreatorFor(user).get();
 	}
 
 	boolean isGravatarUser(User user) {
-		return GravatarImageResolutionCache.INSTANCE.hasGravatarCreator(user);
+		return cache().hasGravatarCreator(user);
     }
 
+	@VisibleForTesting
+	GravatarImageResolutionCache cache() {
+		return GravatarImageResolutionCacheInstance.INSTANCE;
+	}
 }
