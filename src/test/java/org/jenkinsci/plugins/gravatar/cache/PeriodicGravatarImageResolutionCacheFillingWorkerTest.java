@@ -15,12 +15,12 @@ import java.util.List;
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.class)
-public class GravatarImageResolutionCacheLoaderTest {
+public class PeriodicGravatarImageResolutionCacheFillingWorkerTest {
 
 	private List<User> users = Lists.newArrayList();
 
 	@Spy
-	GravatarImageResolutionCacheLoader loader = new GravatarImageResolutionCacheLoader();
+	PeriodicGravatarImageResolutionCacheFillingWorker loader = new PeriodicGravatarImageResolutionCacheFillingWorker();
 
 	@Mock
 	GravatarImageResolutionCache cache;

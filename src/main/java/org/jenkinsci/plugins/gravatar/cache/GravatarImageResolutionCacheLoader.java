@@ -1,81 +1,65 @@
-/*
- * The MIT License
-
- * 
- * Copyright (c) 2011, Erik Ramfelt
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
 package org.jenkinsci.plugins.gravatar.cache;
 
-import java.io.IOException;
-import java.util.Collection;
+import com.google.common.base.Optional;
+import com.google.common.cache.CacheLoader;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
+import org.jenkinsci.plugins.gravatar.boundary.GravatarImageURLVerifier;
+import org.jenkinsci.plugins.gravatar.model.GravatarUrlCreator;
+import org.jenkinsci.plugins.gravatar.model.GravatarUser;
 
-import com.google.common.annotations.VisibleForTesting;
-import hudson.Extension;
-import hudson.model.AsyncPeriodicWork;
-import hudson.model.PeriodicWork;
-import hudson.model.TaskListener;
-import hudson.model.User;
-import org.jenkinsci.plugins.gravatar.UserGravatarResolver;
-import org.jenkinsci.plugins.gravatar.cache.GravatarImageResolutionCache;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.logging.Logger;
 
-/**
- * Async periodic worker that updates the cached map in {@link org.jenkinsci.plugins.gravatar.UserGravatarResolver}
- * It will run at startup and every 30 minutes to check if any user has set a gravatar
- * since last run. The {@link org.jenkinsci.plugins.gravatar.UserGravatarResolver} will cache the check for gravatars
- * so the time required when showing the People pages will be as short as possible. This
- * worker task makes sure that the cache is updated every 30 minutes.
- * 
- * @author Erik Ramfelt
- */
-@Extension
-public class GravatarImageResolutionCacheLoader extends AsyncPeriodicWork{
+class GravatarImageResolutionCacheLoader extends CacheLoader<GravatarUser, Optional<GravatarUrlCreator>> {
 
-    public GravatarImageResolutionCacheLoader() {
-        super("Gravatar periodic lookup");
-    }
+	private static final Logger LOG = Logger.getLogger(GravatarImageResolutionCacheLoader.class.getName());
 
-    @Override
-    protected void execute(TaskListener listener) throws IOException, InterruptedException {
-        for (User user : getAllUsers()) {
-			cache().loadIfUnknown(user);
+
+	private final ListeningExecutorService reloader = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
+
+	@Override
+	public ListenableFuture<Optional<GravatarUrlCreator>> reload(final GravatarUser gravatarUser, Optional<GravatarUrlCreator> oldValue) throws Exception {
+		//optimization: if it was previously known, it is rather safe to suspect, that it is still known (who removes a gravatar?)
+		if(oldValue.isPresent()) {
+			LOG.finer("Reusing old gravatar result value for " + gravatarUser + " because it has been known before.");
+			return Futures.immediateFuture(oldValue);
 		}
-	}
-
-	@VisibleForTesting
-	Collection<User> getAllUsers() {
-		return User.getAll();
+		//otherwise, we try it again, maybe it's there now?
+		LOG.fine("Scheduling " + gravatarUser + " for reloading");
+		ListenableFuture<Optional<GravatarUrlCreator>> future = reloader.submit(new Callable<Optional<GravatarUrlCreator>>() {
+			public Optional<GravatarUrlCreator> call() throws Exception {
+				return load(gravatarUser);
+			}
+		});
+		return future;
 	}
 
 	@Override
-    public long getRecurrencePeriod() {
-        return PeriodicWork.MIN * 30;
-    }
+	public Optional<GravatarUrlCreator> load(GravatarUser gravatarUser) throws Exception {
+		if(!gravatarUser.emailAddress().isPresent()) {
+			LOG.finer("Cannot check for gravatar for user " + gravatarUser + " since no e-mail address is known");
+			return creator();
+		}
+		if(verifier().verify(gravatarUser.emailAddress().get())) {
+			LOG.fine("Verified gravatar for "+gravatarUser);
+			return creatorFor(gravatarUser);
+		}
+		return creator();
+	}
 
-    @Override
-    public long getInitialDelay() {
-        return PeriodicWork.MIN;
-    }
+	private Optional<GravatarUrlCreator> creator() {
+		return Optional.absent();
+	}
 
-	@VisibleForTesting
-	GravatarImageResolutionCache cache() {
-		return GravatarImageResolutionCacheInstance.INSTANCE;
+	private Optional<GravatarUrlCreator> creatorFor(GravatarUser user) {
+		return Optional.of(GravatarUrlCreator.of(user));
+	}
+
+	private GravatarImageURLVerifier verifier() {
+		return new GravatarImageURLVerifier();
 	}
 }
