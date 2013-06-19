@@ -1,5 +1,6 @@
 package org.jenkinsci.plugins.gravatar.cache;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -26,6 +27,11 @@ class GravatarImageResolutionLoadingCache {
 				.refreshAfterWrite(30, TimeUnit.MINUTES)
 				.initialCapacity(User.getAll().size())
 				.build(createUrlForUser());
+	}
+
+	@VisibleForTesting
+	protected GravatarImageResolutionLoadingCache(LoadingCache<GravatarUser, Optional<GravatarUrlCreator>> cache) {
+		this.cache = cache;
 	}
 
 	private CacheLoader<GravatarUser, Optional<GravatarUrlCreator>> createUrlForUser() {
