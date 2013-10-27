@@ -57,16 +57,32 @@
     <guava.version>13.0.1</guava.version>
   </properties>
 
-  <build>
-      <plugins>
-          <plugin>
-              <artifactId>maven-release-plugin</artifactId>
-              <configuration>
-                  <goals>deploy</goals>
-              </configuration>
-          </plugin>
-      </plugins>
-  </build>
+   <build>
+     <pluginManagement>
+       <plugins>
+         <plugin>
+           <artifactId>maven-compiler-plugin</artifactId>
+           <version>2.3.2</version>
+         </plugin>
+         <plugin>
+           <artifactId>maven-deploy-plugin</artifactId>
+           <version>2.5</version>
+         </plugin>
+         <plugin>
+           <artifactId>maven-install-plugin</artifactId>
+           <version>2.3.1</version>
+         </plugin>
+       </plugins>
+     </pluginManagement>
+     <plugins>
+       <plugin>
+         <artifactId>maven-release-plugin</artifactId>
+         <configuration>
+           <goals>deploy</goals>
+         </configuration>
+       </plugin>
+     </plugins>
+   </build>
 
   
   <dependencies>
