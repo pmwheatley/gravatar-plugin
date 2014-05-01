@@ -38,6 +38,11 @@
       <email>david@carrclan.us</email>
       <timezone>-5</timezone>
     </contributor>
+    <contributor>
+      <name>Simon Schlachter</name>
+      <email>github@survive.ch</email>
+      <timezone>+1</timezone>
+    </contributor>
   </contributors>
   
   <scm>
