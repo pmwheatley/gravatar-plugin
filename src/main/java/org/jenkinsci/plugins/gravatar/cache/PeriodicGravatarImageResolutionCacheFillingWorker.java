@@ -22,46 +22,49 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package org.jenkinsci.plugins.gravatar;
+package org.jenkinsci.plugins.gravatar.cache;
 
 import java.io.IOException;
+import java.util.Collection;
 
+import com.google.common.annotations.VisibleForTesting;
 import hudson.Extension;
 import hudson.model.AsyncPeriodicWork;
 import hudson.model.PeriodicWork;
 import hudson.model.TaskListener;
 import hudson.model.User;
-import hudson.tasks.UserAvatarResolver;
+import org.jenkinsci.plugins.gravatar.UserGravatarResolver;
+import org.jenkinsci.plugins.gravatar.cache.GravatarImageResolutionCache;
 
 /**
- * Async periodic worker that updates the cached map in {@link UserGravatarResolver}
+ * Async periodic worker that updates the cached map in {@link org.jenkinsci.plugins.gravatar.UserGravatarResolver}
  * It will run at startup and every 30 minutes to check if any user has set a gravatar
- * since last run. The {@link UserGravatarResolver} will cache the check for gravatars
+ * since last run. The {@link org.jenkinsci.plugins.gravatar.UserGravatarResolver} will cache the check for gravatars
  * so the time required when showing the People pages will be as short as possible. This
  * worker task makes sure that the cache is updated every 30 minutes.
  * 
  * @author Erik Ramfelt
  */
 @Extension
-public class GravatarCheckAsyncPeriodicWork extends AsyncPeriodicWork{
+public class PeriodicGravatarImageResolutionCacheFillingWorker extends AsyncPeriodicWork{
 
-    public GravatarCheckAsyncPeriodicWork() {
+    public PeriodicGravatarImageResolutionCacheFillingWorker() {
         super("Gravatar periodic lookup");
     }
 
     @Override
     protected void execute(TaskListener listener) throws IOException, InterruptedException {
-        UserGravatarResolver tempResolver = new UserGravatarResolver(new GravatarImageURLVerifier(), false);
-        for (User user : User.getAll()) {
-            tempResolver.findAvatarFor(user, 48, 48);
-        }
-        UserGravatarResolver defaultGravatarResolver = UserAvatarResolver.all().get(UserGravatarResolver.class);
-        if (defaultGravatarResolver != null) {
-            defaultGravatarResolver.setEmailHasGravatarMap(tempResolver.getEmailHasGravatarMap());
-        }
-    }
-    
-    @Override
+        for (User user : getAllUsers()) {
+			cache().loadIfUnknown(user);
+		}
+	}
+
+	@VisibleForTesting
+	Collection<User> getAllUsers() {
+		return User.getAll();
+	}
+
+	@Override
     public long getRecurrencePeriod() {
         return PeriodicWork.MIN * 30;
     }
@@ -70,4 +73,9 @@ public class GravatarCheckAsyncPeriodicWork extends AsyncPeriodicWork{
     public long getInitialDelay() {
         return PeriodicWork.MIN;
     }
+
+	@VisibleForTesting
+	GravatarImageResolutionCache cache() {
+		return GravatarImageResolutionCacheInstance.INSTANCE;
+	}
 }

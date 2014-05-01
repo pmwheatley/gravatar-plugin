@@ -23,73 +23,45 @@
  */
 package org.jenkinsci.plugins.gravatar;
 
-import java.util.HashMap;
 import java.util.logging.Logger;
 
-import jenkins.model.Jenkins;
-
-import de.bripkens.gravatar.Gravatar;
-
+import com.google.common.annotations.VisibleForTesting;
 import hudson.Extension;
 import hudson.model.User;
 import hudson.tasks.UserAvatarResolver;
-import hudson.tasks.Mailer;
-import hudson.tasks.Mailer.UserProperty;
+import org.jenkinsci.plugins.gravatar.cache.GravatarImageResolutionCache;
+import org.jenkinsci.plugins.gravatar.cache.GravatarImageResolutionCacheInstance;
+import org.jenkinsci.plugins.gravatar.model.GravatarUrlCreator;
 
 /**
  * UserAvatarResolver that returns Gravatar image URLs for Jenkins users.
  */
 @Extension
 public class UserGravatarResolver extends UserAvatarResolver {
-    
-    private final Gravatar gravatar = new Gravatar();
-    private final GravatarImageURLVerifier gravatarImageURLVerifier;
-    private HashMap<String, Boolean> emailHasGravatarMap;
 
-    public UserGravatarResolver() {
-        this(new GravatarImageURLVerifier(), Jenkins.getInstance().isRootUrlSecure());
-    }
-
-    public UserGravatarResolver(GravatarImageURLVerifier urlVerifier) {
-        this(urlVerifier, false);
-    }
-    
-    public UserGravatarResolver(GravatarImageURLVerifier urlVerifier, boolean isUsingHttps) {
-        gravatarImageURLVerifier = urlVerifier;
-        emailHasGravatarMap = new HashMap<String, Boolean>();
-        gravatar.setHttps(isUsingHttps);
-    }
+	private static final Logger LOG = Logger.getLogger(UserGravatarResolver.class.getName());
 
     @Override
     public String findAvatarFor(User user, int width, int height) {
-        UserProperty mailProperty = user.getProperty(Mailer.UserProperty.class);
-        if (mailProperty != null) {
-            String email = mailProperty.getAddress();
-            if (email != null) {
-                if (checkIfGravatarExistsFor(email)) {
-                    return gravatar.setSize(width).getUrl(email);
-                }
-            }
-        }
-        return null;
+		if (isGravatarUser(user)) {
+			LOG.finest("Resolving gravatar url for user " + user.getId() + " in size " + width + "x" + height);
+			GravatarUrlCreator urlCreator = urlCreatorFor(user);
+			return urlCreator.buildUrlForSize(width);
+		}
+		return null; //we cannot contribute to the avatar resolution for this user
     }
 
-    boolean checkIfGravatarExistsFor(String email) {
-        if (emailHasGravatarMap.containsKey(email)) {
-            return emailHasGravatarMap.get(email).booleanValue();
-        }
-        boolean emailHasGravatar = gravatarImageURLVerifier.verify(email);
-        emailHasGravatarMap.put(email, (emailHasGravatar ? Boolean.TRUE : Boolean.FALSE));
-        return emailHasGravatar;
+	@VisibleForTesting
+	protected GravatarUrlCreator urlCreatorFor(User user) {
+		return cache().urlCreatorFor(user).get();
+	}
+
+	boolean isGravatarUser(User user) {
+		return cache().hasGravatarCreator(user);
     }
 
-    HashMap<String, Boolean> getEmailHasGravatarMap() {
-        return emailHasGravatarMap;
-    }
-
-    void setEmailHasGravatarMap(HashMap<String, Boolean> emailHasGravatarMap) {
-        this.emailHasGravatarMap = emailHasGravatarMap;
-    }
-    
-    private static final Logger LOGGER = Logger.getLogger(UserGravatarResolver.class.getName());
+	@VisibleForTesting
+	GravatarImageResolutionCache cache() {
+		return GravatarImageResolutionCacheInstance.INSTANCE;
+	}
 }

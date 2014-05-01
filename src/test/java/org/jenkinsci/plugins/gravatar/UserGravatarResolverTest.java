@@ -23,23 +23,80 @@
  */
 package org.jenkinsci.plugins.gravatar;
 
-import static org.junit.Assert.*;
-import static org.hamcrest.CoreMatchers.*;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.not;
+import static org.hamcrest.CoreMatchers.nullValue;
+import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.same;
 import static org.mockito.Mockito.*;
 
+import hudson.model.User;
+import hudson.tasks.Mailer;
+import org.jenkinsci.plugins.gravatar.boundary.GravatarImageURLVerifier;
+import org.jenkinsci.plugins.gravatar.model.GravatarUrlCreator;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.mockito.runners.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.class)
 public class UserGravatarResolverTest {
     
-    private GravatarImageURLVerifier urlVerifier;
+	@Mock
+	User user;
+
+	@Mock
+	Mailer.UserProperty mailPropertyOfUser;
+
+	@Mock
+	GravatarUrlCreator urlCreator;
+
+	@Spy
+	UserGravatarResolver resolver = new UserGravatarResolver();
 
     @Before
     public void setUp() {
-        urlVerifier = mock(GravatarImageURLVerifier.class);
-    }
+		when(user.getId()).thenReturn("user");
+		when(user.getProperty(same(Mailer.UserProperty.class))).thenReturn(mailPropertyOfUser);
+	}
 
-    @Test
+	@Test
+	public void resolverShouldNotFindAnythingForAnUnknownUser() throws Exception {
+		makeUserUnknown();
+		assertThat(resolver.findAvatarFor(user, 48, 48), is(nullValue()));
+	}
+
+
+	@Test
+	public void resolverShouldNotLookupAnUnknowUser() throws Exception {
+		makeUserUnknown();
+		verify(resolver, never()).urlCreatorFor(any(User.class));
+	}
+
+	@Test
+	public void aKnownUserIsResolved() throws Exception {
+		makeUserKnown();
+		assertThat(resolver.findAvatarFor(user, 48, 48), is(not(nullValue())));
+		verify(resolver, atLeastOnce()).urlCreatorFor(same(user));
+	}
+
+	private void makeUserKnown() {
+		doReturn(true).when(resolver).isGravatarUser(any(User.class));
+		doReturn(urlCreator).when(resolver).urlCreatorFor(same(user));
+		when(urlCreator.buildUrlForSize(anyInt())).thenReturn("http://my.image.com/123123123");
+	}
+
+
+	private void makeUserUnknown() {
+		doReturn(false).when(resolver).isGravatarUser(any(User.class));
+	}
+
+	/*
+
+	@Test
     public void assertResolverVerifiesThatGravatarExists() {
         UserGravatarResolver resolver = new UserGravatarResolver(urlVerifier);
         when(urlVerifier.verify(anyString())).thenReturn(Boolean.TRUE);
@@ -62,4 +119,6 @@ public class UserGravatarResolverTest {
         resolver.checkIfGravatarExistsFor("eramfelt@gmail.com");
         verify(urlVerifier, times(1)).verify("eramfelt@gmail.com");
     }
+
+    */
 }
