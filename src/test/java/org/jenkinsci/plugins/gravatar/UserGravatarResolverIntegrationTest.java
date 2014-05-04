@@ -36,6 +36,7 @@ import org.xml.sax.SAXException;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Set;
 import java.util.concurrent.*;
 
@@ -114,11 +115,26 @@ public class UserGravatarResolverIntegrationTest extends HudsonTestCase {
 
 	private HtmlPage goAndWaitForLoadOfPeople() throws InterruptedException, IOException, SAXException {
 		HtmlPage htmlPage = wc.goTo("/asynchPeople");
-		while(htmlPage.getElementById("status").isDisplayed()) {
+		while(getStatus(htmlPage).isDisplayed()) {
 			//the asynch part has not yet finished, so we wait.
 			Thread.sleep(500);
 		}
 		return htmlPage;
+	}
+
+	private HtmlElement getStatus(HtmlPage htmlPage) {
+		final HtmlElement statusById = htmlPage.getElementById("status");
+		if(statusById != null) {
+			return statusById;
+		}
+		final ListIterator<HtmlElement> tablesOnPage = htmlPage.getElementsByTagName("table").listIterator();
+		while (tablesOnPage.hasNext()) {
+			HtmlElement next = tablesOnPage.next();
+			if("progress-bar".equalsIgnoreCase(next.getAttribute("class"))) {
+				return next;
+			}
+		}
+		return null;
 	}
 
 	private void createManyManyUsers(int howMany) throws IOException {
