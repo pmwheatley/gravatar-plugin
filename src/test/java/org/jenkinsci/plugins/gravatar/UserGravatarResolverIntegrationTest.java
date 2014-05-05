@@ -28,9 +28,14 @@ import com.gargoylesoftware.htmlunit.html.HtmlElement;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import hudson.model.User;
 import hudson.tasks.Mailer;
+import jenkins.model.Jenkins;
 import org.hamcrest.Matcher;
 import org.jenkinsci.plugins.gravatar.cache.GravatarImageResolutionCacheInstance;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 import org.jvnet.hudson.test.HudsonTestCase;
+import org.jvnet.hudson.test.JenkinsRule;
 import org.xml.sax.SAXException;
 
 import java.io.IOException;
@@ -44,42 +49,48 @@ import static com.google.common.collect.Sets.newHashSetWithExpectedSize;
 import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.assertThat;
 
-public class UserGravatarResolverIntegrationTest extends HudsonTestCase {
-    
-    private WebClient wc;
+public class UserGravatarResolverIntegrationTest {
 
-    public void setUp() throws Exception {
-        super.setUp();
-        wc = createWebClient();
-    }
+	@Rule
+	public JenkinsRule j = new JenkinsRule();
     
+    private JenkinsRule.WebClient wc;
+
+	@Before
+    public void setUp() throws Exception {
+		wc = j.createWebClient();
+    }
+
+	@Test
     public void testUserWithoutEmailAddressUsesDefaultImage() throws Exception {
         newUser("user-no-email");
-        assertAllImageLoadSuccessfully(goAndWaitForLoadOfPeople());
-        assertAllImageLoadSuccessfully(wc.goTo("/user/user-no-email"));
+        j.assertAllImageLoadSuccessfully(goAndWaitForLoadOfPeople());
+        j.assertAllImageLoadSuccessfully(wc.goTo("user/user-no-email"));
     }
-    
-    public void testNonExistingGravatarUsesDefaultImage() throws Exception {
+
+	@Test
+	public void testNonExistingGravatarUsesDefaultImage() throws Exception {
         User user = newUser("user");
         user.addProperty(new Mailer.UserProperty("MyEmailAddress@example.com"));
         
-        assertAllImageLoadSuccessfully(goAndWaitForLoadOfPeople());
-        assertAllImageLoadSuccessfully(wc.goTo("/user/user"));
+        j.assertAllImageLoadSuccessfully(goAndWaitForLoadOfPeople());
+        j.assertAllImageLoadSuccessfully(wc.goTo("user/user"));
 
-        HtmlElement element = wc.goTo("/user/user").getElementById("main-panel").getElementsByTagName("img").get(0);
+        HtmlElement element = wc.goTo("user/user").getElementById("main-panel").getElementsByTagName("img").get(0);
         assertThat(element.getAttribute("src"), endsWith("user.png"));
     }
 
+	@Test
 	public void testGravatarIsUsedForUser() throws Exception {
         User user = newUser("user-e");
         user.addProperty(new Mailer.UserProperty("eramfelt@gmail.com"));
 		prefetchImage(user);
 
 
-		assertAllImageLoadSuccessfully(goAndWaitForLoadOfPeople());
-        assertAllImageLoadSuccessfully(wc.goTo("/user/user-e"));
+		j.assertAllImageLoadSuccessfully(goAndWaitForLoadOfPeople());
+        j.assertAllImageLoadSuccessfully(wc.goTo("user/user-e"));
 
-        HtmlElement element = wc.goTo("/user/user-e").getElementById("main-panel").getElementsByTagName("img").get(0);
+        HtmlElement element = wc.goTo("user/user-e").getElementById("main-panel").getElementsByTagName("img").get(0);
         assertThat(element.getAttribute("src"), startsWith("http://www.gravatar.com"));
     }
 
@@ -87,6 +98,7 @@ public class UserGravatarResolverIntegrationTest extends HudsonTestCase {
 		GravatarImageResolutionCacheInstance.INSTANCE.urlCreatorFor(user);
 	}
 
+	@Test
 	public void testManyManyUsersWillNotBlockLoadingOfUsersPage() throws Exception {
 		final int howMany = 1000;
 
@@ -99,7 +111,7 @@ public class UserGravatarResolverIntegrationTest extends HudsonTestCase {
 		ExecutorService executorService = Executors.newSingleThreadExecutor();
 		Future<HtmlPage> pageFuture = executorService.submit(c);
 		HtmlPage page = pageFuture.get(60, TimeUnit.SECONDS); //if it takes longer than this we consider it to BLOCK!
-		assertAllImageLoadSuccessfully(page);
+		j.assertAllImageLoadSuccessfully(page);
 		assertThatUserCount(page, equalTo(howMany));
 
 	}
@@ -114,7 +126,7 @@ public class UserGravatarResolverIntegrationTest extends HudsonTestCase {
 	}
 
 	private HtmlPage goAndWaitForLoadOfPeople() throws InterruptedException, IOException, SAXException {
-		HtmlPage htmlPage = wc.goTo("/asynchPeople");
+		HtmlPage htmlPage = wc.goTo("asynchPeople");
 		while(getStatus(htmlPage).isDisplayed()) {
 			//the asynch part has not yet finished, so we wait.
 			Thread.sleep(500);
